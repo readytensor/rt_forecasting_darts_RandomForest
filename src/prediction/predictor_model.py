@@ -216,7 +216,6 @@ class Forecaster:
             data_schema=data_schema,
             test_dataframe=test_dataframe,
         )
-
         self.model.fit(
             targets,
             past_covariates=past_covariates,
