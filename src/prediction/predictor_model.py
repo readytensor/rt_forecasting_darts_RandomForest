@@ -111,6 +111,20 @@ class Forecaster:
         if lags_forecast_ratio:
             lags = self.data_schema.forecast_length * lags_forecast_ratio
             self.lags = lags
+            if self.data_schema.past_covariates:
+                self.lags_past_covariates = lags
+            if data_schema.future_covariates or data_schema.time_col_dtype in [
+                "DATE",
+                "DATETIME",
+            ]:
+                self.lags_future_covariates = (lags, self.data_schema.forecast_length)
+
+        if not self.use_exogenous:
+            self.lags_past_covariates = None
+            self.lags_future_covariates = None
+
+        if not self.output_chunk_length:
+            self.output_chunk_length = self.data_schema.forecast_length
 
         self.model = RandomForest(
             lags=self.lags,
@@ -128,7 +142,6 @@ class Forecaster:
         self,
         history: pd.DataFrame,
         data_schema: ForecastingSchema,
-        history_length: int = None,
         test_dataframe: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """
@@ -173,7 +186,7 @@ class Forecaster:
         self.all_ids = all_ids
         scalers = {}
         for index, s in enumerate(all_series):
-            if history_length:
+            if self.history_length:
                 s = s.iloc[-self.history_length :]
             s.reset_index(inplace=True)
 
@@ -210,7 +223,7 @@ class Forecaster:
             ]
 
             for train_series, test_series in zip(all_series, test_all_series):
-                if history_length:
+                if self.history_length:
                     train_series = train_series.iloc[-self.history_length :]
 
                 train_future_covariates = train_series[future_covariates_names]
@@ -245,7 +258,6 @@ class Forecaster:
         self,
         history: pd.DataFrame,
         data_schema: ForecastingSchema,
-        history_length: int = None,
         test_dataframe: pd.DataFrame = None,
     ) -> None:
         """Fit the Forecaster to the training data.
@@ -255,13 +267,11 @@ class Forecaster:
         Args:
             history (pandas.DataFrame): The features of the training data.
             data_schema (ForecastingSchema): The schema of the training data.
-            history_length (int): The length of the series used for training.
             test_dataframe (pd.DataFrame): The testing data (needed only if the data contains future covariates).
         """
         np.random.seed(self.random_state)
         targets, past_covariates, future_covariates = self._prepare_data(
             history=history,
-            history_length=history_length,
             data_schema=data_schema,
             test_dataframe=test_dataframe,
         )
@@ -302,9 +312,10 @@ class Forecaster:
             future_covariates=self.future_covariates,
         )
         prediction_values = []
-        for prediction in predictions:
+        for index, prediction in enumerate(predictions):
             prediction = prediction.pd_dataframe()
             values = prediction.values
+            values = self.scalers[index].inverse_transform(values)
             prediction_values += list(values)
 
         test_data[prediction_col_name] = np.array(prediction_values)
@@ -363,7 +374,6 @@ def train_predictor_model(
     model.fit(
         history=history,
         data_schema=data_schema,
-        history_length=model.history_length,
         test_dataframe=testing_dataframe,
     )
     return model
