@@ -52,6 +52,20 @@ class Forecaster:
 
         Args:
 
+            data_schema (ForecastingSchema):
+                Schema of training data.
+
+            history_forecast_ratio (int):
+                Sets the history length depending on the forecast horizon.
+                For example, if the forecast horizon is 20 and the history_forecast_ratio is 10,
+                history length will be 20*10 = 200 samples.
+
+            lags_forecast_ratio (int):
+                Sets the lags parameters depending on the forecast horizon.
+                lags = lags_past_covariates = forecast horizon * lags_forecast_ratio
+                lags_future_covariates = (lags, forecast horizon)
+                This parameters overides lags parameters.
+
             lags (Union[int, List[int], Dict[str, Union[int, List[int]]], None]):
                 Lagged target series values used to predict the next time step/s.
                 If an integer, must be > 0. Uses the last n=lags past lags; e.g. (-1, -2, …, -lags),
@@ -79,6 +93,7 @@ class Forecaster:
               It is not the same as forecast horizon n used in predict(), which is the desired number of prediction points generated using a one-shot- or auto-regressive forecast.
               Setting n <= output_chunk_length prevents auto-regression. This is useful when the covariates don't extend far enough into the future,
               or to prohibit the model from using future values of past and / or future covariates for prediction (depending on the model's covariate support).
+              If not set, the forecast horizon will be used.
 
             n_estimators (int): The number of trees in the forest.
 
@@ -118,12 +133,11 @@ class Forecaster:
                 "DATE",
                 "DATETIME",
             ]:
-                x, y = lags_future_covariates
-                if not x:
-                    x = lags
-                if not y:
-                    y = self.data_schema.forecast_length
-                self.lags_future_covariates = (x, y)
+                if not self.lags_future_covariates:
+                    self.lags_future_covariates = (
+                        lags,
+                        self.data_schema.forecast_length,
+                    )
 
         if not self.use_exogenous:
             self.lags_past_covariates = None
