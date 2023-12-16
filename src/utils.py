@@ -198,17 +198,17 @@ def make_serializable(obj: Any) -> Union[int, float, List[Union[int, float]], An
 
 
 def process_hyperparameters(hyperparameters: dict, forecast_length: int) -> dict:
-    if (
-        "lags_future_covariates_x" in hyperparameters.keys()
-        and "lags_future_covariates_y" in hyperparameters.keys()
-    ):
+    x = None
+    y = None
+    if "lags_future_covariates_x" in hyperparameters.keys():
         x = hyperparameters.get("lags_future_covariates_x")
+    if "lags_future_covariates_y" in hyperparameters.keys():
         y = hyperparameters.get("lags_future_covariates_y")
 
-        if x and y:
-            hyperparameters["lags_future_covariates"] = (x, y)
+    x_y = (x, y)
 
-        hyperparameters.pop("lags_future_covariates_x")
-        hyperparameters.pop("lags_future_covariates_y")
+    hyperparameters.pop("lags_future_covariates_x")
+    hyperparameters.pop("lags_future_covariates_y")
+    hyperparameters["lags_future_covariates"] = x_y
 
     return hyperparameters

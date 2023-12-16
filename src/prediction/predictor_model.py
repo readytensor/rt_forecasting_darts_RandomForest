@@ -107,17 +107,23 @@ class Forecaster:
             self.history_length = (
                 self.data_schema.forecast_length * history_forecast_ratio
             )
-
         if lags_forecast_ratio:
             lags = self.data_schema.forecast_length * lags_forecast_ratio
             self.lags = lags
-            if self.data_schema.past_covariates:
+
+            if self.data_schema.past_covariates and not self.lags_past_covariates:
                 self.lags_past_covariates = lags
+
             if data_schema.future_covariates or data_schema.time_col_dtype in [
                 "DATE",
                 "DATETIME",
             ]:
-                self.lags_future_covariates = (lags, self.data_schema.forecast_length)
+                x, y = lags_future_covariates
+                if not x:
+                    x = lags
+                if not y:
+                    y = self.data_schema.forecast_length
+                self.lags_future_covariates = (x, y)
 
         if not self.use_exogenous:
             self.lags_past_covariates = None
