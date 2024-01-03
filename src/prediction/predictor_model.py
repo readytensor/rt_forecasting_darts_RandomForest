@@ -45,6 +45,7 @@ class Forecaster:
         max_depth: int = 5,
         multi_models: Optional[bool] = True,
         use_exogenous: bool = True,
+        use_static_covariates=True,
         random_state: int = 0,
         **kwargs,
     ):
@@ -103,6 +104,12 @@ class Forecaster:
                 If True, a separate model will be trained for each future lag to predict.
                 If False, a single model is trained to predict at step 'output_chunk_length' in the future. Default: True.
 
+            use_exogenous (bool): Indicates if covariates are used or not.
+
+            use_static_covariates (bool):
+                Whether the model should use static covariate information in case the input series passed to fit() contain static covariates.
+                If True, and static covariates are available at fitting time, will enforce that all target series have the same static covariate dimensionality in fit() and predict().
+
             random_state (int): Sets the underlying random seed at model initialization time.
         """
         self.data_schema = data_schema
@@ -114,6 +121,7 @@ class Forecaster:
         self.max_depth = max_depth
         self.multi_models = multi_models
         self.use_exogenous = use_exogenous
+        self.use_static_covariates = use_static_covariates
         self.random_state = random_state
         self._is_trained = False
         self.kwargs = kwargs
@@ -127,18 +135,18 @@ class Forecaster:
             lags = self.data_schema.forecast_length * lags_forecast_ratio
             self.lags = lags
 
-            if self.data_schema.past_covariates and not self.lags_past_covariates:
+            if use_exogenous and self.data_schema.past_covariates:
                 self.lags_past_covariates = lags
 
-            if data_schema.future_covariates or data_schema.time_col_dtype in [
-                "DATE",
-                "DATETIME",
-            ]:
-                if not self.lags_future_covariates:
-                    self.lags_future_covariates = (
-                        lags,
-                        self.data_schema.forecast_length,
-                    )
+        if (
+            use_exogenous
+            and not lags_future_covariates
+            and (
+                self.data_schema.future_covariates
+                or self.data_schema.time_col_dtype in ["DATE", "DATETIME"]
+            )
+        ):
+            self.lags_future_covariates = list(range(0, data_schema.forecast_length))
 
         if not self.use_exogenous:
             self.lags_past_covariates = None
@@ -156,6 +164,7 @@ class Forecaster:
             max_depth=self.max_depth,
             random_state=self.random_state,
             multi_models=self.multi_models,
+            use_static_covariates=self.use_static_covariates,
             **kwargs,
         )
 
@@ -163,6 +172,7 @@ class Forecaster:
         self,
         history: pd.DataFrame,
         data_schema: ForecastingSchema,
+        history_length: int = None,
         test_dataframe: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """
@@ -207,7 +217,7 @@ class Forecaster:
         self.all_ids = all_ids
         scalers = {}
         for index, s in enumerate(all_series):
-            if self.history_length:
+            if history_length:
                 s = s.iloc[-self.history_length :]
             s.reset_index(inplace=True)
 
@@ -218,8 +228,18 @@ class Forecaster:
             )
 
             scalers[index] = scaler
+            static_covariates = None
+            if self.use_exogenous and self.data_schema.static_covariates:
+                static_covariates = s[self.data_schema.static_covariates]
 
-            target = TimeSeries.from_dataframe(s, value_cols=data_schema.target)
+            target = TimeSeries.from_dataframe(
+                s,
+                value_cols=data_schema.target,
+                static_covariates=static_covariates.iloc[0]
+                if static_covariates is not None
+                else None,
+            )
+
             targets.append(target)
 
             if data_schema.past_covariates:
@@ -244,7 +264,7 @@ class Forecaster:
             ]
 
             for train_series, test_series in zip(all_series, test_all_series):
-                if self.history_length:
+                if history_length:
                     train_series = train_series.iloc[-self.history_length :]
 
                 train_future_covariates = train_series[future_covariates_names]
@@ -273,6 +293,7 @@ class Forecaster:
             past = None
         if not future:
             future = None
+
         return targets, past, future
 
     def fit(

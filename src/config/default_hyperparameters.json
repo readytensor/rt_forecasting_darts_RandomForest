@@ -1,12 +1,13 @@
 {
   "n_estimators": 100,
-  "lags_forecast_ratio": 4,
+  "lags_forecast_ratio": 3,
   "history_forecast_ratio": 10,
   "random_state": 0,
   "lags_past_covariates": null,
   "lags_future_covariates_x": null,
   "lags_future_covariates_y": null,
   "output_chunk_length": null,
-  "use_exogenous": true
+  "use_exogenous": true,
+  "use_static_covariates": true
 
 }
