@@ -9,12 +9,7 @@ from prediction.predictor_model import (
     train_predictor_model,
 )
 from schema.data_schema import load_json_data_schema, save_schema
-from utils import (
-    read_csv_in_directory,
-    read_json_as_dict,
-    set_seeds,
-    process_hyperparameters,
-)
+from utils import read_csv_in_directory, read_json_as_dict, set_seeds, Timer
 
 logger = get_logger(task_name="train")
 
@@ -80,9 +75,6 @@ def run_training(
         # use default hyperparameters to train model
         logger.info("Training forecaster...")
         default_hyperparameters = read_json_as_dict(default_hyperparameters_file_path)
-        default_hyperparameters = process_hyperparameters(
-            default_hyperparameters, forecast_length=data_schema.forecast_length
-        )
 
         testing_dataframe = None
         if data_schema.future_covariates or data_schema.time_col_dtype in [
@@ -91,12 +83,13 @@ def run_training(
         ]:
             testing_dataframe = read_csv_in_directory(paths.TEST_DIR)
 
-        forecaster = train_predictor_model(
-            history=validated_data,
-            data_schema=data_schema,
-            hyperparameters=default_hyperparameters,
-            testing_dataframe=testing_dataframe,
-        )
+        with Timer(logger) as _:
+            forecaster = train_predictor_model(
+                history=validated_data,
+                data_schema=data_schema,
+                hyperparameters=default_hyperparameters,
+                testing_dataframe=testing_dataframe,
+            )
 
         # save predictor model
         logger.info("Saving forecaster...")

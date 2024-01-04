@@ -1,3 +1,4 @@
+import time
 import json
 import os
 import random
@@ -197,21 +198,15 @@ def make_serializable(obj: Any) -> Union[int, float, List[Union[int, float]], An
         return json.JSONEncoder.default(None, obj)
 
 
-def process_hyperparameters(hyperparameters: dict, forecast_length: int) -> dict:
-    x = None
-    y = None
-    if "lags_future_covariates_x" in hyperparameters.keys():
-        x = hyperparameters.get("lags_future_covariates_x")
-    if "lags_future_covariates_y" in hyperparameters.keys():
-        y = hyperparameters.get("lags_future_covariates_y")
+class Timer(object):
+    def __init__(self, logger):
+        self.logger = logger
 
-    if not x and not y:
-        x_y = None
-    else:
-        x_y = (x, y)
+    def __enter__(self):
+        self.start = time.time()
+        return self
 
-    hyperparameters.pop("lags_future_covariates_x")
-    hyperparameters.pop("lags_future_covariates_y")
-    hyperparameters["lags_future_covariates"] = x_y
-
-    return hyperparameters
+    def __exit__(self, *args):
+        self.end = time.time()
+        self.interval = self.end - self.start
+        self.logger.info(f"Execution time: {self.interval:.2f} seconds")
