@@ -39,7 +39,7 @@ class Forecaster:
             List[int],
             Dict[str, Union[Tuple[int, int], List[int]]],
             None,
-        ] = (10, 10),
+        ] = None,
         output_chunk_length: int = None,
         n_estimators: int = 100,
         max_depth: int = 5,
