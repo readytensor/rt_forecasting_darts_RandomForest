@@ -1,13 +1,15 @@
 {
-  "n_estimators": 100,
+  "n_estimators": 50,
+  "criterion": "squared_error",
   "max_depth": 10,
   "min_samples_split": 6,
-  "min_samples_leaf": 2,
+  "min_samples_leaf": 3,
   "lags_forecast_ratio": 3,
   "history_forecast_ratio": 10,
   "random_state": 0,
   "lags_past_covariates": null,
   "output_chunk_length": null,
   "use_exogenous": true,
-  "use_static_covariates": true
+  "use_static_covariates": true,
+  "bootstrap": true
 }
