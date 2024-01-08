@@ -41,12 +41,12 @@ class Forecaster:
             None,
         ] = None,
         output_chunk_length: int = None,
-        forecast_horizon_output_chunk_length: int = None,
         n_estimators: int = 100,
         max_depth: int = 10,
         multi_models: Optional[bool] = True,
-        use_exogenous: bool = True,
-        use_static_covariates=True,
+        use_past_covariates: bool = True,
+        use_future_covariates: bool = True,
+        use_static_covariates: bool = True,
         random_state: int = 0,
         **kwargs,
     ):
@@ -109,7 +109,11 @@ class Forecaster:
                 If True, a separate model will be trained for each future lag to predict.
                 If False, a single model is trained to predict at step 'output_chunk_length' in the future. Default: True.
 
-            use_exogenous (bool): Indicates if covariates are used or not.
+            use_past_covariates (bool):
+                Whether the model should use past covariates if available.
+
+            use_future_covariates (bool):
+                Whether the model should use future covariates if available.
 
             use_static_covariates (bool):
                 Whether the model should use static covariate information in case the input series passed to fit() contain static covariates.
@@ -125,17 +129,23 @@ class Forecaster:
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.multi_models = multi_models
-        self.use_exogenous = use_exogenous
-        self.use_static_covariates = use_exogenous and use_static_covariates
+        self.use_past_covariates = (
+            use_past_covariates and len(data_schema.past_covariates) > 0
+        )
+        self.use_future_covariates = use_future_covariates and (
+            len(data_schema.future_covariates) > 0
+            or self.data_schema.time_col_dtype in ["DATE", "DATETIME"]
+        )
+        self.use_static_covariates = (
+            use_static_covariates and len(data_schema.static_covariates) > 0
+        )
         self.random_state = random_state
         self._is_trained = False
         self.kwargs = kwargs
         self.history_length = None
 
         if not self.output_chunk_length:
-            self.output_chunk_length = (
-                self.data_schema.forecast_length // forecast_horizon_output_chunk_length
-            )
+            self.output_chunk_length = self.data_schema.forecast_length
 
         if history_forecast_ratio:
             self.history_length = (
@@ -145,21 +155,16 @@ class Forecaster:
             lags = self.data_schema.forecast_length * lags_forecast_ratio
             self.lags = lags
 
-            if use_exogenous and self.data_schema.past_covariates:
+            if self.use_past_covariates and self.data_schema.past_covariates:
                 self.lags_past_covariates = lags
 
-        if (
-            use_exogenous
-            and not lags_future_covariates
-            and (
-                self.data_schema.future_covariates
-                or self.data_schema.time_col_dtype in ["DATE", "DATETIME"]
-            )
-        ):
+        if use_future_covariates and not lags_future_covariates:
             self.lags_future_covariates = list(range(0, self.output_chunk_length))
 
-        if not self.use_exogenous:
+        if not self.use_past_covariates:
             self.lags_past_covariates = None
+
+        if not self.use_future_covariates:
             self.lags_future_covariates = None
 
         self.model = RandomForest(
@@ -231,7 +236,7 @@ class Forecaster:
 
             scalers[index] = scaler
             static_covariates = None
-            if self.use_exogenous and self.data_schema.static_covariates:
+            if self.use_static_covariates and self.data_schema.static_covariates:
                 static_covariates = s[self.data_schema.static_covariates]
 
             target = TimeSeries.from_dataframe(
@@ -285,9 +290,9 @@ class Forecaster:
 
         self.scalers = scalers
         self.future_scalers = future_scalers
-        if not past or not self.use_exogenous:
+        if not past or not self.use_past_covariates:
             past = None
-        if not future or not self.use_exogenous:
+        if not future or not self.use_future_covariates:
             future = None
 
         return targets, past, future
@@ -347,7 +352,7 @@ class Forecaster:
                 )
                 future.append(future_covariates)
 
-        if not future or not self.use_exogenous:
+        if not future or not self.use_future_covariates:
             future = None
         else:
             for index, (train_covariates, test_covariates) in enumerate(

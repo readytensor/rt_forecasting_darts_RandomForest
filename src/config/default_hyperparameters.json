@@ -9,8 +9,8 @@
   "random_state": 0,
   "lags_past_covariates": null,
   "output_chunk_length": 1,
-  "forecast_horizon_output_chunk_length": null,
-  "use_exogenous": false,
+  "use_past_covariates": false,
+  "use_future_covariates": true,
   "use_static_covariates": true,
   "bootstrap": true
 }
