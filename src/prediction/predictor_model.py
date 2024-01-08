@@ -41,8 +41,9 @@ class Forecaster:
             None,
         ] = None,
         output_chunk_length: int = None,
+        forecast_horizon_output_chunk_length: int = None,
         n_estimators: int = 100,
-        max_depth: int = 5,
+        max_depth: int = 10,
         multi_models: Optional[bool] = True,
         use_exogenous: bool = True,
         use_static_covariates=True,
@@ -96,6 +97,10 @@ class Forecaster:
               or to prohibit the model from using future values of past and / or future covariates for prediction (depending on the model's covariate support).
               If not set, the forecast horizon will be used.
 
+            forecast_horizon_output_chunk_length (int):
+                Sets the output_chunk_length parameter.
+                output_chunk_length = int(forecast_horizon / forecast_horizon_output_chunk_length)
+
             n_estimators (int): The number of trees in the forest.
 
             max_depth (int): The maximum depth of the tree. If None, then nodes are expanded until all leaves are pure or until all leaves contain less than min_samples_split samples.
@@ -127,6 +132,11 @@ class Forecaster:
         self.kwargs = kwargs
         self.history_length = None
 
+        if not self.output_chunk_length:
+            self.output_chunk_length = (
+                self.data_schema.forecast_length // forecast_horizon_output_chunk_length
+            )
+
         if history_forecast_ratio:
             self.history_length = (
                 self.data_schema.forecast_length * history_forecast_ratio
@@ -146,14 +156,11 @@ class Forecaster:
                 or self.data_schema.time_col_dtype in ["DATE", "DATETIME"]
             )
         ):
-            self.lags_future_covariates = list(range(0, data_schema.forecast_length))
+            self.lags_future_covariates = list(range(0, self.output_chunk_length))
 
         if not self.use_exogenous:
             self.lags_past_covariates = None
             self.lags_future_covariates = None
-
-        if not self.output_chunk_length:
-            self.output_chunk_length = self.data_schema.forecast_length
 
         self.model = RandomForest(
             lags=self.lags,
