@@ -43,7 +43,7 @@ class Forecaster:
         output_chunk_length: int = None,
         n_estimators: int = 100,
         max_depth: int = 10,
-        multi_models: Optional[bool] = True,
+        multi_models: Optional[bool] = False,
         use_past_covariates: bool = True,
         use_future_covariates: bool = True,
         use_static_covariates: bool = True,
